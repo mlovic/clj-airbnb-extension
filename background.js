@@ -5,10 +5,9 @@ chrome.runtime.onInstalled.addListener(function() {
     // With a new rule ...
     chrome.declarativeContent.onPageChanged.addRules([
       {
-        // That fires when a page's URL contains a 'g' ...
         conditions: [
           new chrome.declarativeContent.PageStateMatcher({
-            pageUrl: { urlContains: 'airbnb.com/rooms' },
+            pageUrl: { urlMatches: 'airbnb.com/(s|rooms)/' },
             // TODO allow for all airbnb, but display error if tried
             // at page other than room
           })
@@ -20,12 +19,20 @@ chrome.runtime.onInstalled.addListener(function() {
   });
 });
 
-var base_url = "http://mlovic.com";
-//var base_url = "http://localhost:8080";
+//var base_url = "http://mlovic.com";
+var base_url = "http://localhost:8080";
 //
 
 function getListingId(url) {
   return url.split("/")[4].split("?")[0];
+};
+
+function getQueryString(url) {
+  return url.split("?")[1];
+};
+
+function getLocation(url) {
+  return url.match(/com\/s\/(.*)?\?/)[1]; // string instead of regex literal?
 };
 
 function isTargetURL(url) {
@@ -33,7 +40,7 @@ function isTargetURL(url) {
 };
 
 function checkForExistingAlert() {
-  console.log("checking for existing alert")
+  console.log("checking for existing alert");
   chrome.tabs.query({currentWindow: true, active: true}, function(tabs){
     var tab = tabs[0];
     console.log(tab);
@@ -65,30 +72,52 @@ function checkForExistingAlert() {
 chrome.tabs.onUpdated.addListener(checkForExistingAlert);
 // TODO change icon for listings that already have alert
 
-function sendListing(id, tab) {
-  var url = base_url + "/?id=" + id;
+function postAlert(path, callback) {
+  let url = base_url + path;
   console.log("url: " + url);
   var xhr = new XMLHttpRequest();
   xhr.open("POST", url); // add true for async
   // also check onreadystatechange
-  // TODO move into callback in main fn
   xhr.onload = function() {
     console.log("onload...")
     console.log(xhr.response)
     if (xhr.status == 200) {  // http status between 200 to 299 are all successful
       console.log("successful");
-      chrome.pageAction.setIcon({path: "dark_icon.png", tabId: tab.id});
+      callback();
     }
   }
   xhr.onerror = function() {
     alert('Network error');
   }
   xhr.send();
-  // TODO on completed callback - set icon
-};
+}
+
+function pageType(tab) {
+  switch (tab.url.match(/com\/(.*)?\//)[1]) {
+  case "rooms":
+    return "listing";
+  case "s":
+    return "search";
+  }
+}
 
 chrome.pageAction.onClicked.addListener(function(tab){
-  var listingId= getListingId(tab.url);
-  sendListing(listingId, tab);
+  console.log("what is path?");
+  console.log(path);
+  //let url = tab.url;
+  switch (pageType(tab)) {
+    case "listing":
+      var path = "/?id=" + getListingId(tab.url);
+      break;
+    case "search":
+      var path = "/search-query?location=" + getLocation(tab.url) +
+                 "&query_url=" + encodeURIComponent(getQueryString(tab.url));
+      break;
+    default:
+      throw "Page must be listing or search page";
+  }
+  postAlert(path, function() {
+    chrome.pageAction.setIcon({path: "dark_icon.png", tabId: tab.id});
+  });
   // make ajax call here
 });
