@@ -39,6 +39,8 @@ function isTargetURL(url) {
   return url.indexOf("airbnb.com/rooms/") > -1
 };
 
+// Check if the listing in the corresponding tab is already being monitored
+// TODO separate querying chrome API from HTTP request
 function checkForExistingAlert() {
   console.log("checking for existing alert");
   chrome.tabs.query({currentWindow: true, active: true}, function(tabs){
@@ -72,6 +74,7 @@ function checkForExistingAlert() {
 chrome.tabs.onUpdated.addListener(checkForExistingAlert);
 // TODO change icon for listings that already have alert
 
+// add alert to the system
 function postAlert(path, callback) {
   let url = base_url + path;
   console.log("url: " + url);
